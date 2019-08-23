@@ -78,7 +78,6 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 input_batch, output_batch, target_batch = make_batch(sentences)
-#print(input_batch.size(),output_batch.size(), target_batch.size())
 
 #training
 for epoch in range(1000):
