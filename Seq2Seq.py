@@ -123,11 +123,8 @@ def inference(model, encoder_inputs, decoder_input):
 
 decoder_input = [np.eye(n_class)[[word_dict[n] for n in 'S']]]
 decoder_input = torch.Tensor(decoder_input)
-print(decoder_input.size())
 predict = inference(model, input_batch, decoder_input)
-print(predict.size())
-predict = predict.squeeze(0)
-predict = predict.data.max(1, keepdim=True)[1]
+predict = predict.data.max(2, keepdim=True)[1]
 print(sentences[0], '->', [number_dict[n.item()] for n in predict.squeeze()])
 
 # Show Attention
