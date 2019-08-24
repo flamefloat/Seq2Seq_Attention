@@ -59,11 +59,13 @@ class seq2seq(nn.Module):
         batch_size = decoder_inputs.size(0)
         n_step = decoder_inputs.size(1) # seq_len
         output = torch.empty([batch_size, n_step, n_class])
+        trained_attn = []
         for i in range(n_step):
             temp_decoder_input = decoder_inputs[:, i, :].unsqueeze(1)
             #print('*********',aa.size(), hidden_state.size())
             decoder_output, hidden_state = self.decoder(temp_decoder_input, hidden_state)
             attn_weight = self.get_att_weight(encoder_hidden_states, decoder_output)
+            trained_attn.append(attn_weight.squeeze().data.numpy())
             attn_weight = attn_weight.unsqueeze(1)
             #[batch, 1, n_step] * [batch, n_step, hidden_size]
             context = torch.matmul(attn_weight, encoder_hidden_states)
@@ -71,17 +73,19 @@ class seq2seq(nn.Module):
             decoder_output = decoder_output.squeeze(1)
             full_state = torch.cat((context, decoder_output), 1)
             output[:, i, :] = self.out(full_state)
-        return output
+        return output, trained_attn
+
+
 
 model = seq2seq()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.002)
 
 input_batch, output_batch, target_batch = make_batch(sentences)
 
 #training
-for epoch in range(1000):
-    output = model(input_batch, output_batch)
+for epoch in range(800):
+    output, trained_attn = model(input_batch, output_batch)
     n_step = input_batch.size(1)
     loss = 0
     for i in range(n_step):
@@ -92,7 +96,47 @@ for epoch in range(1000):
     loss.backward()
     optimizer.step()
 
+#inference
+def inference(model, encoder_inputs, decoder_input):
+    encoder_hidden_states, hidden_state= model.encoder(encoder_inputs)
+    batch_size = encoder_inputs.size(0)
+    n_step = encoder_inputs.size(1) # seq_len
+    output = torch.empty([batch_size, n_step, n_class])
+    trained_attn = []
+    for i in range(n_step):
+        #print('*********',aa.size(), hidden_state.size())
+        decoder_output, hidden_state = model.decoder(decoder_input, hidden_state)
+        attn_weight = model.get_att_weight(encoder_hidden_states, decoder_output)
+        trained_attn.append(attn_weight.squeeze().data.numpy())
+        attn_weight = attn_weight.unsqueeze(1)
+        #[batch, 1, n_step] * [batch, n_step, hidden_size]
+        context = torch.matmul(attn_weight, encoder_hidden_states)
+        context = context.squeeze(1)
+        decoder_output = decoder_output.squeeze(1)
+        full_state = torch.cat((context, decoder_output), 1)
+        output[:, i, :] = model.out(full_state)
+        temp_decoder_input = output[:, i, :]#[batch, hidden_size]
+        out_word = temp_decoder_input.data.max(1, keepdim=True)[1]
+        decoder_input = [np.eye(n_class)[[n for n in out_word]]]
+        decoder_input = torch.Tensor(decoder_input)
+    return output
 
+decoder_input = [np.eye(n_class)[[word_dict[n] for n in 'S']]]
+decoder_input = torch.Tensor(decoder_input)
+print(decoder_input.size())
+predict = inference(model, input_batch, decoder_input)
+print(predict.size())
+predict = predict.squeeze(0)
+predict = predict.data.max(1, keepdim=True)[1]
+print(sentences[0], '->', [number_dict[n.item()] for n in predict.squeeze()])
+
+# Show Attention
+fig = plt.figure(figsize=(5, 5))
+ax = fig.add_subplot(1, 1, 1)
+ax.matshow(trained_attn, cmap='viridis')
+ax.set_xticklabels([''] + sentences[0].split(), fontdict={'fontsize': 14})
+ax.set_yticklabels([''] + sentences[2].split(), fontdict={'fontsize': 14})
+plt.show()
             
 
         
