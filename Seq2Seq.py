@@ -37,7 +37,7 @@ class seq2seq(nn.Module):
         n_batch = encoder_hidden_states.size(0)
         n_step = encoder_hidden_states.size(1) #[batch, seq_len, hidden_size]
         attn_scores = torch.zeros(n_batch, n_step)
-        for i in range(n_batch, n_step):
+        for i in range(n_step):
             temp_encoder_hidden_state = encoder_hidden_states[:, i, :].unsqueeze(1)
             attn_scores[:, i] = self.get_att_score(temp_encoder_hidden_state, decoder_hidden_state)
         return F.softmax(attn_scores, dim = 1) #[batch, seq_len]
